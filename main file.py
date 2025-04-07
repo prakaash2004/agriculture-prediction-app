@@ -1,97 +1,53 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import plotly.graph_objects as go
 
-# ---------------------------------------------
-# Step 1: User Inputs
-# ---------------------------------------------
-st.title("🌾 Agriculture Modal Price Forecasting (Simple Version)")
-state_input = st.text_input("Enter the State:")
-district_input = st.text_input("Enter the District:")
-commodity_input = st.text_input("Enter the Commodity:")
-future_year = st.number_input("Enter the Future Year (e.g., 2035):", min_value=2024, step=1)
+# -------------------------------
+# Title & Inputs
+# -------------------------------
+st.title("🌾 Agricultural Modal Price Forecasting")
 
-# Load data only if inputs are provided
-if state_input and district_input and commodity_input and future_year:
-    # ---------------------------------------------
-    # Step 2: Load and filter agri.csv
-    # ---------------------------------------------
+state_input = st.text_input("Enter the State")
+district_input = st.text_input("Enter the District")
+commodity_input = st.text_input("Enter the Commodity")
+future_year = st.number_input("Enter the future year (e.g., 2030):", min_value=2025, max_value=2100, step=1)
+
+# -------------------------------
+# Load agri.csv
+# -------------------------------
+@st.cache_data
+def load_agri_data():
     try:
-        df = pd.read_csv("agri.csv", usecols=['state', 'district', 'commodity', 'arrival_date', 'modal_price'])
-    except:
-        st.error("🚫 Error loading agri.csv")
-        st.stop()
+        agri_cols = ['state', 'district', 'commodity', 'arrival_date', 'modal_price']
+        df = pd.read_csv("agri.csv", usecols=agri_cols)
+        df['arrival_date'] = pd.to_datetime(df['arrival_date'], format="%d/%m/%Y", errors='coerce')
+        df = df.dropna(subset=['arrival_date', 'modal_price'])
+        df['year'] = df['arrival_date'].dt.year
+        return df
+    except Exception as e:
+        st.error(f"🚫 Error loading agri.csv: {e}")
+        return None
 
-    mask = (
-        (df['state'] == state_input) &
-        (df['district'] == district_input) &
-        (df['commodity'] == commodity_input)
-    )
+agri_df = load_agri_data()
 
-    df_filtered = df[mask].copy()
-    df_filtered['arrival_date'] = pd.to_datetime(df_filtered['arrival_date'], errors='coerce', dayfirst=True)
-    df_filtered = df_filtered.dropna(subset=['arrival_date', 'modal_price'])
-    df_filtered['year'] = df_filtered['arrival_date'].dt.year
-    df_yearly = df_filtered.groupby('year')['modal_price'].mean().reset_index()
-
-    if df_yearly.empty:
-        st.warning("⚠️ No data found for the given filters.")
-        st.stop()
-
-    # ---------------------------------------------
-    # Step 3: Predict using simple linear regression (manual)
-    # ---------------------------------------------
-    years = df_yearly['year'].values
-    prices = df_yearly['modal_price'].values
-
-    # Manual linear regression using numpy
-    coeffs = np.polyfit(years, prices, deg=1)
-    trend = np.poly1d(coeffs)
-
-    # Predict future years
-    last_year = years.max()
-    prediction_years = np.arange(last_year + 1, future_year + 1)
-    predicted_prices = trend(prediction_years)
-
-    # Combine data
-    all_years = np.concatenate([years, prediction_years])
-    all_prices = np.concatenate([prices, predicted_prices])
-    label = ['Historical'] * len(years) + ['Predicted'] * len(prediction_years)
-
-    df_combined = pd.DataFrame({
-        'Year': all_years,
-        'Modal Price': all_prices,
-        'Type': label
-    })
-
-    # ---------------------------------------------
-    # Step 4: Display outputs
-    # ---------------------------------------------
-    st.subheader("📊 Historical and Predicted Prices")
-    historical = df_combined[df_combined['Type'] == 'Historical'].set_index('Year')
-    predicted = df_combined[df_combined['Type'] == 'Predicted'].set_index('Year')
-
-    st.line_chart(historical['Modal Price'])
-    st.line_chart(predicted['Modal Price'])
-
-    st.metric(f"📌 Predicted Modal Price for {future_year}", f"{predicted_prices[-1]:.2f}")
-
-    # ---------------------------------------------
-    # Optional: Climate integration
-    # ---------------------------------------------
+# -------------------------------
+# Load climate.csv
+# -------------------------------
+@st.cache_data
+def load_climate_data():
     try:
-        df_climate = pd.read_csv("climate.csv")
-        df_state_climate = df_climate[df_climate['state'] == state_input]
-        numeric_features = df_state_climate.select_dtypes(include=np.number).iloc[0]
+        return pd.read_csv("climate.csv")
+    except Exception as e:
+        st.error(f"🚫 Error loading climate.csv: {e}")
+        return None
 
-        st.subheader("🌦️ Climate Features")
-        st.dataframe(numeric_features.to_frame("Value"))
-        st.bar_chart(numeric_features)
-    except:
-        st.info("ℹ️ Climate data not available or could not be loaded.")
+climate_df = load_climate_data()
 
-    # ---------------------------------------------
-    # Raw data preview
-    # ---------------------------------------------
-    st.subheader("🔍 Raw Historical Data")
-    st.dataframe(df_yearly)
+# -------------------------------
+# Process & Forecast
+# -------------------------------
+if agri_df is not None and climate_df is not None and state_input and district_input and commodity_input:
+    filtered = agri_df[
+        (agri_df['state'] == state_input) &
+        (
