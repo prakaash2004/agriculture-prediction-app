@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import sys
 
 from tensorflow.keras.models import Sequential
@@ -124,54 +122,19 @@ if uploaded_agri and uploaded_climate and state_input and district_input and com
         new_row_scaled = scaler_X.transform(new_row_raw.reshape(1, -1))[0]
         current_seq = np.vstack([current_seq[1:], new_row_scaled])
 
-    # =========================== Graph 1: Price Prediction ===========================
-    historical_years = df_agg['year'].values
-    historical_modal_prices = df_agg['modal_price'].values
+    # =========================== Display Results ===========================
+    st.subheader("📘 Historical Modal Price Summary")
+    st.dataframe(df_agg[['year', 'modal_price']])
 
-    fig1, ax1 = plt.subplots(figsize=(12, 5))
-    ax1.plot(historical_years, historical_modal_prices, marker='o', label='Historical')
-    ax1.plot(predicted_years, predicted_modal_prices, marker='x', linestyle='--', color='red', label='Predicted')
-    ax1.annotate(f"{future_year}: {predicted_modal_prices[-1]:.2f}",
-                 xy=(future_year, predicted_modal_prices[-1]),
-                 xytext=(10, -15), textcoords='offset points',
-                 arrowprops=dict(arrowstyle="->", color='black'))
-    ax1.set_xlabel('Year')
-    ax1.set_ylabel('Modal Price')
-    ax1.set_title(f'Modal Price Forecast: {commodity_input} in {district_input}, {state_input}')
-    ax1.legend()
-    st.pyplot(fig1)
+    st.subheader("📘 Climate Features Used")
+    climate_df = pd.DataFrame([state_climate_features], columns=climate_features)
+    st.dataframe(climate_df)
 
-    # =========================== Graph 2: Climate Features ===========================
-    fig2, ax2 = plt.subplots(figsize=(8, 5))
-    ax2.bar(climate_features, state_climate_features, color='skyblue')
-    ax2.set_xlabel("Climate Feature")
-    ax2.set_ylabel("Value")
-    ax2.set_title(f"Climate Data for {state_input}")
-    plt.xticks(rotation=45)
-    st.pyplot(fig2)
+    st.subheader("📘 Forecasted Prices")
+    forecast_df = pd.DataFrame({
+        "Year": predicted_years,
+        "Predicted Modal Price": predicted_modal_prices
+    })
+    st.dataframe(forecast_df)
 
-    # =========================== Graph 3: Combined Modal + Climate ===========================
-    combined_years = np.concatenate([historical_years, predicted_years])
-    selected_feat = climate_features[0]
-    climate_line = np.full(len(combined_years), state_climate_features[climate_features.index(selected_feat)])
-
-    fig3, ax3a = plt.subplots(figsize=(12, 5))
-    ax3a.plot(historical_years, historical_modal_prices, marker='o', color='tab:blue', label='Historical')
-    ax3a.plot(predicted_years, predicted_modal_prices, marker='x', linestyle='--', color='tab:red', label='Predicted')
-    ax3a.set_ylabel('Modal Price', color='tab:blue')
-    ax3a.set_xlabel('Year')
-    ax3a.tick_params(axis='y', labelcolor='tab:blue')
-
-    ax3b = ax3a.twinx()
-    ax3b.plot(combined_years, climate_line, linestyle=':', color='tab:green', label=selected_feat)
-    ax3b.set_ylabel(selected_feat, color='tab:green')
-    ax3b.tick_params(axis='y', labelcolor='tab:green')
-    fig3.suptitle(f'Modal Price vs {selected_feat}')
-    st.pyplot(fig3)
-
-    # =========================== Graph 4: Correlation Heatmap ===========================
-    fig4, ax4 = plt.subplots(figsize=(10, 8))
-    correlation = df_agg.corr()
-    sns.heatmap(correlation, annot=True, cmap='coolwarm', fmt=".2f", ax=ax4)
-    ax4.set_title('Correlation Heatmap')
-    st.pyplot(fig4)
+    st.success(f"Predicted Modal Price for {commodity_input} in {district_input}, {state_input} for the year {future_year}: ₹{predicted_modal_prices[-1]:.2f}")
