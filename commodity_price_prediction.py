@@ -3,6 +3,10 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+
+# Fix matplotlib backend for Streamlit
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import MinMaxScaler
@@ -115,13 +119,11 @@ else:
     st.pyplot(fig)
 
     # Heatmap
-    all_years = list(df_agg['Year']) + predicted_years
-    all_prices = list(df_agg['modal_price']) + predicted_prices
-    heat_df = pd.DataFrame({'Year': all_years, 'Price': all_prices})
-    heat_df['Type'] = ['Historical']*len(df_agg) + ['Predicted']*len(predicted_years)
+    heat_df = pd.DataFrame({'Year': df_agg['Year'].tolist() + predicted_years,
+                            'Price': df_agg['modal_price'].tolist() + predicted_prices,
+                            'Type': ['Historical'] * len(df_agg) + ['Predicted'] * len(predicted_years)})
 
-    pivot = heat_df.pivot_table(index='Type', columns='Year', values='Price')
-
+    pivot = heat_df.pivot('Type', 'Year', 'Price')
     fig2, ax2 = plt.subplots(figsize=(12, 3))
     sns.heatmap(pivot, annot=True, fmt='.1f', cmap='coolwarm', ax=ax2)
     st.pyplot(fig2)
