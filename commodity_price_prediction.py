@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# Fix matplotlib backend for Streamlit
+# Set matplotlib backend for Streamlit
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -123,7 +123,7 @@ else:
                             'Price': df_agg['modal_price'].tolist() + predicted_prices,
                             'Type': ['Historical'] * len(df_agg) + ['Predicted'] * len(predicted_years)})
 
-    pivot = heat_df.pivot('Type', 'Year', 'Price')
+    pivot = heat_df.pivot(index='Type', columns='Year', values='Price')
     fig2, ax2 = plt.subplots(figsize=(12, 3))
     sns.heatmap(pivot, annot=True, fmt='.1f', cmap='coolwarm', ax=ax2)
     st.pyplot(fig2)
