@@ -1,59 +1,144 @@
-# commodity_price_prediction.py (Simplified and Corrected Version)
-
 import streamlit as st
 import pandas as pd
 import numpy as np
-
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
-
-st.set_page_config(page_title='Commodity Price Predictor', layout='wide')
-st.title('📈 Commodity Price Prediction App')
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Input, LSTM, Dense
+import warnings
+warnings.filterwarnings('ignore')
 
 # Load dataset
-@st.cache_data
-def load_data():
-    return pd.read_csv('agrio.csv')
+df = pd.read_csv('agrio.csv')
+df_2025 = df[df['Year'] == 2025]
 
-data = load_data()
+# Title
+st.title("📊 Agri Commodity Price Explorer & LSTM Prediction")
 
-# Sidebar for user selection
-st.sidebar.header('Select Options')
-commodity = st.sidebar.selectbox('Commodity:', sorted(data['Commodity'].unique()))
-state = st.sidebar.selectbox('State:', sorted(data[data['Commodity'] == commodity]['State'].unique()))
-district = st.sidebar.selectbox('District:', sorted(data[(data['Commodity'] == commodity) & (data['State'] == state)]['District'].unique()))
+# Step 1: Select Commodity
+commodity = st.selectbox("Select Commodity", sorted(df_2025['Commodity'].unique()))
 
-# Filter data
-filtered_data = data[(data['Commodity'] == commodity) & (data['State'] == state) & (data['District'] == district)]
+# Show Top 3 Prices for Commodity
+st.subheader("🔝 Top 3 Markets by Price (2025)")
+top3 = df_2025[df_2025['Commodity'] == commodity].sort_values('Price per kg (INR)', ascending=False).head(3)
+st.dataframe(top3[['State', 'District', 'Market', 'Price per kg (INR)']])
 
-if filtered_data.empty:
-    st.error("No data available for the selected combination.")
-else:
-    df_agg = filtered_data.groupby('Year')['Price per kg (INR)'].mean().reset_index()
+# Step 2: Select State filtered by commodity
+filtered_states = df_2025[df_2025['Commodity'] == commodity]['State'].unique()
+state = st.selectbox("Select State", sorted(filtered_states))
 
-    # Plot historical prices
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.plot(df_agg['Year'], df_agg['Price per kg (INR)'], marker='o', color='blue', label='Historical Prices')
-    ax.set_xlabel('Year')
-    ax.set_ylabel('Price per kg (INR)')
-    ax.set_title(f'{commodity} Prices in {district}, {state}')
-    ax.grid()
-    ax.legend()
+# Show Top 5 Prices for that State
+st.subheader("🏆 Top 5 Prices in Selected State")
+top5 = df_2025[(df_2025['Commodity'] == commodity) & (df_2025['State'] == state)]
+top5 = top5.sort_values('Price per kg (INR)', ascending=False).head(5)
+st.dataframe(top5[['District', 'Market', 'Price per kg (INR)']])
 
-    st.pyplot(fig)
+# Step 3: Select District filtered by state and commodity
+filtered_districts = df_2025[(df_2025['Commodity'] == commodity) & (df_2025['State'] == state)]['District'].unique()
+district = st.selectbox("Select District", sorted(filtered_districts))
 
-    # Display data table
-    st.subheader('Historical Price Data')
-    st.dataframe(df_agg)
+# Show All Markets in District
+st.subheader("📍 Markets in Selected District")
+market_df = df_2025[
+    (df_2025['Commodity'] == commodity) &
+    (df_2025['State'] == state) &
+    (df_2025['District'] == district)
+].sort_values('Price per kg (INR)', ascending=False)
+st.dataframe(market_df[['Market', 'Price per kg (INR)']])
 
-    # Simple future price estimation
-    avg_growth_rate = df_agg['Price per kg (INR)'].pct_change().mean()
-    last_price = df_agg['Price per kg (INR)'].iloc[-1]
-    future_year = st.sidebar.number_input('Predict for year:', min_value=df_agg['Year'].max() + 1, max_value=2100, value=df_agg['Year'].max() + 1)
+# Step 4: Prediction
+st.subheader("📈 Predict Future Price")
+future_year = st.number_input("Select Future Year", min_value=2025, max_value=2100, value=2030, step=1)
+run_prediction = st.button("Run LSTM Prediction")
 
-    years_to_predict = future_year - df_agg['Year'].max()
-    predicted_price = last_price * ((1 + avg_growth_rate) ** years_to_predict)
+if run_prediction:
+    df_filtered = df[
+        (df['State'] == state) &
+        (df['District'] == district) &
+        (df['Commodity'] == commodity)
+    ]
 
-    st.success(f'✅ Predicted price of {commodity} in {district}, {state} for the year {future_year} is ₹{predicted_price:.2f}/kg.')
+    if df_filtered.empty:
+        st.error("No matching data found.")
+    else:
+        df_agg = df_filtered.groupby('Year')['Price per kg (INR)'].mean().reset_index()
+        df_agg.rename(columns={'Price per kg (INR)': 'modal_price'}, inplace=True)
+
+        scaler_X = MinMaxScaler()
+        scaled_data = scaler_X.fit_transform(df_agg.values)
+
+        scaler_y = MinMaxScaler()
+        y_scaled = scaler_y.fit_transform(df_agg['modal_price'].values.reshape(-1, 1))
+
+        def create_sequences(data, target, look_back=3):
+            X, y = [], []
+            for i in range(len(data) - look_back):
+                X.append(data[i:i+look_back])
+                y.append(target[i+look_back])
+            return np.array(X), np.array(y)
+
+        look_back = 3
+        X_seq, y_seq = create_sequences(scaled_data, y_scaled, look_back)
+
+        model = Sequential([
+            Input(shape=(look_back, scaled_data.shape[1])),
+            LSTM(50, activation='relu'),
+            Dense(1)
+        ])
+        model.compile(optimizer='adam', loss='mse')
+        model.fit(X_seq, y_seq, epochs=50, verbose=0)
+
+        last_year = df_agg['Year'].max()
+        n_future = future_year - last_year
+
+        if n_future <= 0:
+            st.warning(f"Future year must be greater than {last_year}.")
+        else:
+            current_seq = scaled_data[-look_back:].copy()
+            predicted_years = []
+            predicted_prices = []
+
+            for i in range(n_future):
+                pred = model.predict(current_seq[np.newaxis, :])[0]
+                raw_pred = scaler_y.inverse_transform(pred.reshape(-1, 1))[0][0]
+                raw_pred = max(raw_pred, predicted_prices[-1]) if predicted_prices else max(raw_pred, df_agg['modal_price'].iloc[-1])
+
+                new_year = last_year + i + 1
+                predicted_years.append(new_year)
+                predicted_prices.append(raw_pred)
+
+                new_row_raw = np.array([new_year, raw_pred])
+                new_row_scaled = scaler_X.transform(new_row_raw.reshape(1, -1))[0]
+                current_seq = np.vstack([current_seq[1:], new_row_scaled])
+
+            smoothed_prices = [predicted_prices[0]]
+            for i in range(1, len(predicted_prices)):
+                prev_price = smoothed_prices[-1]
+                curr_price = predicted_prices[i]
+                if curr_price < prev_price * 0.97:
+                    curr_price = prev_price * 0.97
+                smoothed_prices.append(curr_price)
+            predicted_prices = smoothed_prices
+
+            fig, ax = plt.subplots(figsize=(10, 5))
+            ax.plot(df_agg['Year'], df_agg['modal_price'], marker='o', label='Historical')
+            ax.plot(predicted_years, predicted_prices, marker='x', linestyle='--', color='red', label='Predicted')
+            ax.set_title(f"{commodity} Price Forecast in {district}, {state}")
+            ax.set_xlabel("Year")
+            ax.set_ylabel("Price (INR)")
+            ax.legend()
+            ax.grid(True)
+            st.pyplot(fig)
+
+            all_years = list(df_agg['Year']) + predicted_years
+            all_prices = list(df_agg['modal_price']) + predicted_prices
+            heat_df = pd.DataFrame({'Year': all_years, 'Price': all_prices})
+            heat_df['Category'] = ['Historical'] * len(df_agg) + ['Predicted'] * len(predicted_years)
+            pivot = heat_df.pivot_table(index='Category', columns='Year', values='Price')
+
+            fig2, ax2 = plt.subplots(figsize=(12, 2))
+            sns.heatmap(pivot, annot=True, fmt=".1f", cmap='coolwarm', ax=ax2)
+            st.pyplot(fig2)
+
+            st.success(f"📌 Predicted modal price of {commodity} in {district}, {state} for {future_year} is ₹{predicted_prices[-1]:.2f}/kg")
