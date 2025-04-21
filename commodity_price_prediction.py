@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -66,6 +67,11 @@ if commodity:
                 else:
                     df_agg = df_filtered.groupby('Year')['Price per kg (INR)'].mean().reset_index()
                     df_agg.rename(columns={'Price per kg (INR)': 'modal_price'}, inplace=True)
+
+                    # Check for flat price data
+                    if df_agg['modal_price'].nunique() == 1:
+                        st.warning("⚠️ All price values are same. Prediction will be flat. Adding small random variation for demo.")
+                        df_agg['modal_price'] = df_agg['modal_price'] + np.random.uniform(-0.5, 0.5, size=len(df_agg))
 
                     scaler_X = MinMaxScaler()
                     scaled_data = scaler_X.fit_transform(df_agg.values)
