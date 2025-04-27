@@ -8,14 +8,14 @@ from tensorflow.keras.layers import Input, LSTM, Dense
 import warnings
 warnings.filterwarnings('ignore')
 
-# Streamlit Page Setup
+# Page Setup
 st.set_page_config(page_title="Agri Price Forecast", page_icon="🌾", layout="wide")
 
 # Load Dataset
 df = pd.read_csv('agrio.csv')
 df_2025 = df[df['Year'] == 2025]
 
-st.title("🌾 Agriculture Commodity Monitoring and Inflation-Corrected Forecasting System")
+st.title("🌾 Agriculture Commodity Monitoring and Realistic Forecasting System")
 
 # DOMAIN 1: Real-Time Commodity Values
 st.header("📊 Real-Time 2025 Commodity Explorer")
@@ -50,7 +50,7 @@ if commodity:
                 st.dataframe(top5[['District', 'Market', 'Price per kg (INR)']])
 
 # DOMAIN 2: Future Forecast
-st.header("🔮 Future Price Forecast Using LSTM + Inflation Correction")
+st.header("🔮 Future Price Forecast Using LSTM (Realistic 2-year fall limit)")
 
 if commodity and state and district:
     future_year = st.number_input("Select Future Year", min_value=2025, max_value=2100, value=2030)
@@ -102,21 +102,40 @@ if commodity and state and district:
             predicted_prices_scaled = []
 
             rainfall_base = df_agg['Rainfall (cm)'].iloc[-1]
+            fall_years = 0  # Track how many consecutive falls
+
+            previous_price = df_agg['modal_price'].iloc[-1]
 
             for _ in range(n_future):
                 pred_scaled = model.predict(current_seq[np.newaxis, :])[0][0]
 
-                # Apply strong inflation correction (+2% every year)
                 inflation_correction = pred_scaled * 0.02
-
-                # Very mild random fluctuation (+/-0.5%)
                 random_fluctuation = pred_scaled * np.random.normal(0, 0.005)
-
-                # Minor rainfall effect
                 rainfall_effect = np.random.normal(0, 1)
 
-                # Final predicted price scaled
                 corrected_pred_scaled = pred_scaled + inflation_correction + random_fluctuation
+
+                # Inverse scaling temporarily to get real-world price
+                real_predicted_price = scaler.inverse_transform(
+                    np.array([[0, corrected_pred_scaled, rainfall_base]])
+                )[0][1]
+
+                if real_predicted_price < previous_price:
+                    fall_years += 1
+                else:
+                    fall_years = 0  # reset if rising
+
+                # If more than 2 consecutive falls ➔ Force price to rise
+                if fall_years > 2:
+                    real_predicted_price = previous_price * 1.02  # +2% rise
+                    fall_years = 0  # reset fall counter
+
+                previous_price = real_predicted_price
+
+                # Rescale corrected price
+                corrected_pred_scaled = scaler.transform(
+                    np.array([[0, real_predicted_price, rainfall_base]])
+                )[0][1]
 
                 predicted_prices_scaled.append(corrected_pred_scaled)
                 predicted_years.append(last_year + 1)
@@ -135,17 +154,17 @@ if commodity and state and district:
                 ])
             )[:,1]
 
-            # Final Smoothing
+            # Smoothing
             future_prices_smoothed = pd.Series(future_prices).rolling(window=2, min_periods=1).mean()
 
             # Plot
-            st.subheader("📈 Final Price Forecast Graph (With Inflation Correction)")
+            st.subheader("📈 Final Corrected Price Prediction Graph")
             fig, ax = plt.subplots(figsize=(12,6))
             ax.plot(df_agg['Year'], historical_prices, marker='o', label='Historical Price', color='blue')
             ax.plot(predicted_years, future_prices_smoothed, marker='x', linestyle='--', color='green', label='Predicted Price')
             ax.set_xlabel("Year")
             ax.set_ylabel("Price (INR)")
-            ax.set_title(f"{commodity} Price Forecast in {district}, {state}")
+            ax.set_title(f"{commodity} Price Forecast for {district}, {state}")
             ax.legend()
             ax.grid(True)
             st.pyplot(fig)
