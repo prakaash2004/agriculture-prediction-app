@@ -22,22 +22,10 @@ st.header("📊 Real-Time 2025 Commodity Explorer")
 commodity = st.selectbox("Select Commodity", sorted(df_2025['Commodity'].unique()))
 
 if commodity:
-    st.subheader("Top 3 Markets Across India")
-    top3_india = df_2025[df_2025['Commodity'] == commodity]\
-        .sort_values('Price per kg (INR)', ascending=False).head(3)
-    st.dataframe(top3_india[['State', 'District', 'Market', 'Price per kg (INR)']])
-
     states = df_2025[df_2025['Commodity'] == commodity]['State'].unique()
     state = st.selectbox("Select State", sorted(states))
 
     if state:
-        st.subheader(f"Top 3 Markets in {state}")
-        top3_state = df_2025[
-            (df_2025['Commodity'] == commodity) &
-            (df_2025['State'] == state)
-        ].sort_values('Price per kg (INR)', ascending=False).head(3)
-        st.dataframe(top3_state[['District', 'Market', 'Price per kg (INR)']])
-
         districts = df_2025[
             (df_2025['Commodity'] == commodity) &
             (df_2025['State'] == state)
@@ -45,7 +33,26 @@ if commodity:
         district = st.selectbox("Select District", sorted(districts))
 
         if district:
-            st.subheader(f"All Markets for {commodity} in {district}, {state}")
+            st.subheader(f"🔍 {commodity} Markets in {district}, {state}")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                top3 = df_2025[
+                    (df_2025['Commodity'] == commodity)
+                ].sort_values('Price per kg (INR)', ascending=False).head(3)
+                st.write("Top 3 Markets for Selected Commodity")
+                st.dataframe(top3[['State', 'District', 'Market', 'Price per kg (INR)']])
+
+            with col2:
+                top5 = df_2025[
+                    (df_2025['Commodity'] == commodity) &
+                    (df_2025['State'] == state)
+                ].sort_values('Price per kg (INR)', ascending=False).head(5)
+                st.write(f"Top 5 in {state}")
+                st.dataframe(top5[['District', 'Market', 'Price per kg (INR)']])
+
+            # Show all market prices in the selected district
+            st.write(f"All Markets in {district}, {state} for {commodity}")
             district_markets = df_2025[
                 (df_2025['Commodity'] == commodity) &
                 (df_2025['State'] == state) &
@@ -77,13 +84,16 @@ if commodity and state and district:
 
                 df_agg.rename(columns={'Price per kg (INR)': 'modal_price'}, inplace=True)
 
-                # Calculate inflation from historical price data
+                # Auto-compute average inflation rate from historical prices
                 df_agg['prev_price'] = df_agg['modal_price'].shift(1)
                 df_agg['inflation'] = (df_agg['modal_price'] - df_agg['prev_price']) / df_agg['prev_price']
                 inflation_rate = df_agg['inflation'].dropna().mean()
-                inflation_rate = max(inflation_rate, 0.01)  # avoid negative/very low
+                inflation_rate = max(inflation_rate, 0.01)
 
-                # Scaling
+                # Historical volatility
+                historical_changes = df_agg['modal_price'].pct_change().dropna()
+                volatility = historical_changes.std() * 0.5  # tuned smaller
+
                 features = df_agg[['Year', 'modal_price', 'Rainfall (cm)']]
                 scaler = MinMaxScaler()
                 scaled = scaler.fit_transform(features)
@@ -119,19 +129,12 @@ if commodity and state and district:
                 for _ in range(n_future):
                     pred_scaled = model.predict(current_seq[np.newaxis, :])[0][0]
 
-                    # Estimate real price
-                    rough_real_pred = scaler.inverse_transform(
-                        np.array([[0, pred_scaled, rainfall_base]])
-                    )[0][1]
+                    # Apply inflation + historical fluctuation
+                    price_change = np.random.normal(loc=inflation_rate, scale=volatility)
+                    final_price = last_real_price * (1 + price_change)
 
-                    # Apply inflation and fluctuation
-                    inflated_price = last_real_price * (1 + inflation_rate)
-                    fluctuation = np.random.uniform(-0.01, 0.01) * inflated_price
-                    final_price = inflated_price + fluctuation
-
-                    # Allow small dip but prevent steep fall
-                    if final_price < last_real_price * 0.97:
-                        final_price = last_real_price * 0.97
+                    # Clamp to avoid unrealistic drop
+                    final_price = max(final_price, last_real_price * 0.90)
 
                     last_real_price = final_price
                     predicted_years.append(last_year + 1)
@@ -144,7 +147,6 @@ if commodity and state and district:
                     current_seq = np.vstack([current_seq[1:], next_input])
                     last_year += 1
 
-                # Plot
                 historical_prices = df_agg['modal_price'].tolist()
                 future_prices = scaler.inverse_transform(
                     np.column_stack([
