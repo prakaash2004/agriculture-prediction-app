@@ -17,7 +17,7 @@ df_2025 = df[df['Year'] == 2025]
 
 st.title("🌾 Agriculture Commodity Monitoring and Realistic Forecasting System")
 
-# ------------------- DOMAIN 1: Real-Time Commodity Values -------------------
+# -------------------- DOMAIN 1: Real-Time Commodity Explorer --------------------
 st.header("📊 Real-Time 2025 Commodity Explorer")
 commodity = st.selectbox("Select Commodity", sorted(df_2025['Commodity'].unique()))
 
@@ -52,7 +52,7 @@ if commodity:
             ].sort_values('Price per kg (INR)', ascending=False)
             st.dataframe(all_markets[['Market', 'Price per kg (INR)']])
 
-# ------------------- DOMAIN 2: LSTM Forecasting -------------------
+# -------------------- DOMAIN 2: LSTM Forecasting --------------------
 st.header("🔮 Future Price Forecast Using LSTM (Realistic 2-year fall limit)")
 
 if commodity and state and district:
@@ -72,7 +72,6 @@ if commodity and state and district:
                 'Price per kg (INR)': 'mean',
                 'Rainfall (cm)': 'mean'
             }).reset_index()
-
             df_agg.rename(columns={'Price per kg (INR)': 'modal_price'}, inplace=True)
 
             features = df_agg[['Year', 'modal_price', 'Rainfall (cm)']]
@@ -107,17 +106,16 @@ if commodity and state and district:
             rainfall_base = df_agg['Rainfall (cm)'].iloc[-1]
             fall_years = 0
             previous_price = df_agg['modal_price'].iloc[-1]
-
             historical_prices = df_agg['modal_price'].tolist()
 
-            # Calculate average past inflation rate
-            past_years = df_agg['Year'].tolist()
+            # Average inflation rate from real data
             past_prices = df_agg['modal_price'].tolist()
-            avg_inflation = np.mean([
-                (past_prices[i] - past_prices[i - 1]) / past_prices[i - 1]
+            inflation_rates = [
+                (past_prices[i] - past_prices[i-1]) / past_prices[i-1]
                 for i in range(1, len(past_prices))
-                if past_prices[i - 1] > 0
-            ])
+                if past_prices[i-1] > 0
+            ]
+            avg_inflation = np.mean(inflation_rates)
 
             for _ in range(n_future):
                 pred_scaled = model.predict(current_seq[np.newaxis, :])[0][0]
@@ -154,7 +152,7 @@ if commodity and state and district:
                 current_seq = np.vstack([current_seq[1:], next_input])
                 last_year += 1
 
-            # Final inverse transform
+            # Inverse transform predicted
             future_prices = scaler.inverse_transform(
                 np.column_stack([
                     np.linspace(df_agg['Year'].max()+1, future_year, len(predicted_prices_scaled)),
