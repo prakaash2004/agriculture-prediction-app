@@ -54,7 +54,7 @@ if commodity:
                 st.dataframe(top5[['District', 'Market', 'Price per kg (INR)']])
 
 # DOMAIN 2: Future Forecast
-st.header("🔮 Future Price Forecast Using LSTM (Auto-inflation from history)")
+st.header("🔮 Future Price Forecast Using LSTM (Realistic 2-year fall limit)")
 
 if commodity and state and district:
     future_year = st.number_input("Select Future Year", min_value=2025, max_value=2100, value=2030)
@@ -77,10 +77,11 @@ if commodity and state and district:
 
                 df_agg.rename(columns={'Price per kg (INR)': 'modal_price'}, inplace=True)
 
-                # Calculate inflation from historical data
-                df_agg['inflation'] = df_agg['modal_price'].pct_change()
-                recent_inflation = df_agg['inflation'].dropna().tail(3).mean()
-                estimated_inflation = max(min(recent_inflation, 0.1), 0.005)  # clamp between 0.5% and 10%
+                # Auto-compute average inflation rate from historical prices
+                df_agg['prev_price'] = df_agg['modal_price'].shift(1)
+                df_agg['inflation'] = (df_agg['modal_price'] - df_agg['prev_price']) / df_agg['prev_price']
+                inflation_rate = df_agg['inflation'].dropna().mean()
+                inflation_rate = max(inflation_rate, 0.01)  # prevent negative or too low
 
                 features = df_agg[['Year', 'modal_price', 'Rainfall (cm)']]
                 scaler = MinMaxScaler()
@@ -117,18 +118,24 @@ if commodity and state and district:
                 for _ in range(n_future):
                     pred_scaled = model.predict(current_seq[np.newaxis, :])[0][0]
 
-                    # Inflation-based correction
-                    inflated_price = last_real_price * (1 + estimated_inflation)
+                    # Rough real price for baseline
+                    rough_real_pred = scaler.inverse_transform(
+                        np.array([[0, pred_scaled, rainfall_base]])
+                    )[0][1]
+
+                    # Add inflation and small fluctuation
+                    inflated_price = last_real_price * (1 + inflation_rate)
                     fluctuation = np.random.uniform(-0.01, 0.01) * inflated_price
                     final_price = inflated_price + fluctuation
 
-                    # Prevent drastic drops
+                    # Avoid unrealistic dip
                     if final_price < last_real_price * 0.97:
                         final_price = last_real_price * 0.97
 
                     last_real_price = final_price
                     predicted_years.append(last_year + 1)
 
+                    # Rescale for input
                     corrected_scaled = scaler.transform([[0, final_price, rainfall_base]])[0][1]
                     predicted_prices_scaled.append(corrected_scaled)
 
@@ -137,7 +144,7 @@ if commodity and state and district:
                     current_seq = np.vstack([current_seq[1:], next_input])
                     last_year += 1
 
-                # Prepare plot
+                # Final plot
                 historical_prices = df_agg['modal_price'].tolist()
                 future_prices = scaler.inverse_transform(
                     np.column_stack([
