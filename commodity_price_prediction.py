@@ -10,7 +10,8 @@ warnings.filterwarnings('ignore')
 
 # Page Setup
 st.set_page_config(page_title="Agri Price Forecast", page_icon="🌾", layout="wide")
-
+image_url = "https://raw.githubusercontent.com/yourusername/your-repo/main/images/my_image.jpg"
+st.image(image_url, caption="Image from GitHub", use_column_width=True)
 # Load Dataset
 df = pd.read_csv('agrio.csv')
 df_2025 = df[df['Year'] == 2025]
@@ -170,3 +171,18 @@ if commodity and state and district:
                 st.pyplot(fig)
 
                 st.success(f"📌 Predicted Modal Price of {commodity} in {district}, {state} for {future_year} is ₹{future_prices_smoothed.iloc[-1]:.2f}/kg")
+                # DOMAIN 3: Live Image Gallery
+st.header("🖼️ Live Image Gallery")
+
+image_urls = [
+    "https://github.com/prakaash2004/agriculture-prediction-app/imgage1.jpg",
+    "https://github.com/prakaash2004/agriculture-prediction-app/imgage2.jpg",
+    "https://github.com/prakaash2004/agriculture-prediction-app/imgage3.jpg",
+    "https://github.com/prakaash2004/agriculture-prediction-app/imgage4.jpg",
+    
+]
+
+cols = st.columns(4)
+for i, url in enumerate(image_urls):
+    with cols[i]:
+        st.image(url, use_column_width=True, caption=f"Image {i+1}")
