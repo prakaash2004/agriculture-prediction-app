@@ -8,10 +8,8 @@ from tensorflow.keras.layers import Input, LSTM, Dense
 import warnings
 warnings.filterwarnings('ignore')
 
-# Page Setup
-st.set_page_config(page_title="Agri Price Forecast", page_icon="🌾", layout="wide")
-image_url = "https://raw.githubusercontent.com/yourusername/your-repo/main/images/my_image.jpg"
-st.image(image_url, caption="Image from GitHub", use_column_width=True)
+
+
 # Load Dataset
 df = pd.read_csv('agrio.csv')
 df_2025 = df[df['Year'] == 2025]
