@@ -1,5 +1,4 @@
 import streamlit as st
-from streamlit.components.v1 import html
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,7 +8,11 @@ from tensorflow.keras.layers import Input, LSTM, Dense
 import warnings
 warnings.filterwarnings('ignore')
 
-# Background image slideshow using HTML and CSS
+# Page Setup
+st.set_page_config(page_title="Agri Price Forecast", page_icon="🌾", layout="wide")
+
+# HTML Background Slideshow
+from streamlit.components.v1 import html
 html_code = """
 <style>
 body {
@@ -20,7 +23,6 @@ body {
   transition: background-image 1s ease-in-out;
   animation: bgslide 20s infinite;
 }
-
 @keyframes bgslide {
   0% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage1.jpg'); }
   25% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage2.jpg'); }
@@ -32,16 +34,17 @@ body {
 """
 html(html_code, height=0)
 
-# Streamlit Page Setup
-st.set_page_config(page_title="Agri Price Forecast", page_icon="🌾", layout="wide")
-
-st.title("🌾 Agriculture Commodity Monitoring and Realistic Forecasting System")
+# Optional: Show an image header (can be removed if not needed)
+image_url = "https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage1.jpg"
+st.image(image_url, caption="Agri Forecast System", use_container_width=True)
 
 # Load Dataset
 df = pd.read_csv('agrio.csv')
 df_2025 = df[df['Year'] == 2025]
 
-# DOMAIN 1: Real-Time 2025 Commodity Explorer
+st.title("🌾 Agriculture Commodity Monitoring and Realistic Forecasting System")
+
+# DOMAIN 1: Real-Time Commodity Values
 st.header("📊 Real-Time 2025 Commodity Explorer")
 commodity = st.selectbox("Select Commodity", sorted(df_2025['Commodity'].unique()))
 
@@ -50,10 +53,7 @@ if commodity:
     state = st.selectbox("Select State", sorted(states))
 
     if state:
-        districts = df_2025[
-            (df_2025['Commodity'] == commodity) &
-            (df_2025['State'] == state)
-        ]['District'].unique()
+        districts = df_2025[(df_2025['Commodity'] == commodity) & (df_2025['State'] == state)]['District'].unique()
         district = st.selectbox("Select District", sorted(districts))
 
         if district:
@@ -61,17 +61,12 @@ if commodity:
 
             col1, col2 = st.columns(2)
             with col1:
-                top3 = df_2025[
-                    (df_2025['Commodity'] == commodity)
-                ].sort_values('Price per kg (INR)', ascending=False).head(3)
+                top3 = df_2025[df_2025['Commodity'] == commodity].sort_values('Price per kg (INR)', ascending=False).head(3)
                 st.write("Top 3 Markets for Selected Commodity")
                 st.dataframe(top3[['State', 'District', 'Market', 'Price per kg (INR)']])
 
             with col2:
-                top5 = df_2025[
-                    (df_2025['Commodity'] == commodity) &
-                    (df_2025['State'] == state)
-                ].sort_values('Price per kg (INR)', ascending=False).head(5)
+                top5 = df_2025[(df_2025['Commodity'] == commodity) & (df_2025['State'] == state)].sort_values('Price per kg (INR)', ascending=False).head(5)
                 st.write(f"Top 5 in {state}")
                 st.dataframe(top5[['District', 'Market', 'Price per kg (INR)']])
 
@@ -83,7 +78,7 @@ if commodity:
             ].sort_values('Price per kg (INR)', ascending=False)
             st.dataframe(district_markets[['Market', 'Price per kg (INR)']])
 
-# DOMAIN 2: Future Forecast Using LSTM
+# DOMAIN 2: Future Forecast
 st.header("🔮 Future Price Forecast Using LSTM")
 
 if commodity and state and district:
@@ -104,7 +99,6 @@ if commodity and state and district:
                     'Price per kg (INR)': 'mean',
                     'Rainfall (cm)': 'mean'
                 }).reset_index()
-
                 df_agg.rename(columns={'Price per kg (INR)': 'modal_price'}, inplace=True)
 
                 df_agg['prev_price'] = df_agg['modal_price'].shift(1)
@@ -155,6 +149,7 @@ if commodity and state and district:
                     last_real_price = final_price
 
                     predicted_years.append(last_year + 1)
+
                     corrected_scaled = scaler.transform([[0, final_price, rainfall_base]])[0][1]
                     predicted_prices_scaled.append(corrected_scaled)
 
@@ -163,20 +158,19 @@ if commodity and state and district:
                     current_seq = np.vstack([current_seq[1:], next_input])
                     last_year += 1
 
-                historical_prices = df_agg['modal_price'].tolist()
                 future_prices = scaler.inverse_transform(
                     np.column_stack([
                         np.linspace(df_agg['Year'].max()+1, future_year, len(predicted_prices_scaled)),
                         predicted_prices_scaled,
                         [rainfall_base]*len(predicted_prices_scaled)
                     ])
-                )[:,1]
+                )[:, 1]
 
                 future_prices_smoothed = pd.Series(future_prices).rolling(window=2, min_periods=1).mean()
 
                 st.subheader("📈 Final Corrected Price Prediction Graph")
                 fig, ax = plt.subplots(figsize=(12, 6))
-                ax.plot(df_agg['Year'], historical_prices, marker='o', label='Historical Price', color='blue')
+                ax.plot(df_agg['Year'], df_agg['modal_price'], marker='o', label='Historical Price', color='blue')
                 ax.plot(predicted_years, future_prices_smoothed, marker='x', linestyle='--', color='green', label='Predicted Price')
                 ax.set_xlabel("Year")
                 ax.set_ylabel("Price (INR)")
