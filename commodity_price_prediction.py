@@ -169,15 +169,5 @@ if commodity and state and district:
                 st.pyplot(fig)
 
                 st.success(f"📌 Predicted Modal Price of {commodity} in {district}, {state} for {future_year} is ₹{future_prices_smoothed.iloc[-1]:.2f}/kg")
-                st.header("🖼️ Live Image Gallery")
 
-image_urls = [
-    "https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage1.jpg",
- 
-]
-
-cols = st.columns()
-for i, url in enumerate(image_urls):
-    with cols[i]:
-        st.image(url, use_container_width=True, caption=f"Image {i+1}")
 
