@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit.components.v1 import html
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,17 +9,39 @@ from tensorflow.keras.layers import Input, LSTM, Dense
 import warnings
 warnings.filterwarnings('ignore')
 
-# Page Setup
+# Background image slideshow using HTML and CSS
+html_code = """
+<style>
+body {
+  margin: 0;
+  padding: 0;
+  background-size: cover;
+  background-position: center;
+  transition: background-image 1s ease-in-out;
+  animation: bgslide 20s infinite;
+}
+
+@keyframes bgslide {
+  0% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage1.jpg'); }
+  25% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage2.jpg'); }
+  50% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage3.jpg'); }
+  75% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage4.jpg'); }
+  100% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage1.jpg'); }
+}
+</style>
+"""
+html(html_code, height=0)
+
+# Streamlit Page Setup
 st.set_page_config(page_title="Agri Price Forecast", page_icon="🌾", layout="wide")
-image_url = "https://raw.githubusercontent.com/yourusername/your-repo/main/images/my_image.jpg"
-st.image(image_url, caption="Image from GitHub", use_column_width=True)
+
+st.title("🌾 Agriculture Commodity Monitoring and Realistic Forecasting System")
+
 # Load Dataset
 df = pd.read_csv('agrio.csv')
 df_2025 = df[df['Year'] == 2025]
 
-st.title("🌾 Agriculture Commodity Monitoring and Realistic Forecasting System")
-
-# DOMAIN 1: Real-Time Commodity Values
+# DOMAIN 1: Real-Time 2025 Commodity Explorer
 st.header("📊 Real-Time 2025 Commodity Explorer")
 commodity = st.selectbox("Select Commodity", sorted(df_2025['Commodity'].unique()))
 
@@ -52,7 +75,6 @@ if commodity:
                 st.write(f"Top 5 in {state}")
                 st.dataframe(top5[['District', 'Market', 'Price per kg (INR)']])
 
-            # Show all market prices in the selected district
             st.write(f"All Markets in {district}, {state} for {commodity}")
             district_markets = df_2025[
                 (df_2025['Commodity'] == commodity) &
@@ -61,7 +83,7 @@ if commodity:
             ].sort_values('Price per kg (INR)', ascending=False)
             st.dataframe(district_markets[['Market', 'Price per kg (INR)']])
 
-# DOMAIN 2: Future Forecast
+# DOMAIN 2: Future Forecast Using LSTM
 st.header("🔮 Future Price Forecast Using LSTM")
 
 if commodity and state and district:
@@ -85,15 +107,13 @@ if commodity and state and district:
 
                 df_agg.rename(columns={'Price per kg (INR)': 'modal_price'}, inplace=True)
 
-                # Auto-compute average inflation rate from historical prices
                 df_agg['prev_price'] = df_agg['modal_price'].shift(1)
                 df_agg['inflation'] = (df_agg['modal_price'] - df_agg['prev_price']) / df_agg['prev_price']
                 inflation_rate = df_agg['inflation'].dropna().mean()
                 inflation_rate = max(inflation_rate, 0.01)
 
-                # Historical volatility
                 historical_changes = df_agg['modal_price'].pct_change().dropna()
-                volatility = historical_changes.std() * 0.5  # tuned smaller
+                volatility = historical_changes.std() * 0.5
 
                 features = df_agg[['Year', 'modal_price', 'Rainfall (cm)']]
                 scaler = MinMaxScaler()
@@ -129,17 +149,12 @@ if commodity and state and district:
 
                 for _ in range(n_future):
                     pred_scaled = model.predict(current_seq[np.newaxis, :])[0][0]
-
-                    # Apply inflation + historical fluctuation
                     price_change = np.random.normal(loc=inflation_rate, scale=volatility)
                     final_price = last_real_price * (1 + price_change)
-
-                    # Clamp to avoid unrealistic drop
                     final_price = max(final_price, last_real_price * 0.90)
-
                     last_real_price = final_price
-                    predicted_years.append(last_year + 1)
 
+                    predicted_years.append(last_year + 1)
                     corrected_scaled = scaler.transform([[0, final_price, rainfall_base]])[0][1]
                     predicted_prices_scaled.append(corrected_scaled)
 
@@ -160,7 +175,7 @@ if commodity and state and district:
                 future_prices_smoothed = pd.Series(future_prices).rolling(window=2, min_periods=1).mean()
 
                 st.subheader("📈 Final Corrected Price Prediction Graph")
-                fig, ax = plt.subplots(figsize=(12,6))
+                fig, ax = plt.subplots(figsize=(12, 6))
                 ax.plot(df_agg['Year'], historical_prices, marker='o', label='Historical Price', color='blue')
                 ax.plot(predicted_years, future_prices_smoothed, marker='x', linestyle='--', color='green', label='Predicted Price')
                 ax.set_xlabel("Year")
@@ -171,31 +186,3 @@ if commodity and state and district:
                 st.pyplot(fig)
 
                 st.success(f"📌 Predicted Modal Price of {commodity} in {district}, {state} for {future_year} is ₹{future_prices_smoothed.iloc[-1]:.2f}/kg")
-                # DOMAIN 3: Live Image Gallery
-from streamlit.components.v1 import html
-
-html_code = """
-<style>
-body {
-  margin: 0;
-  padding: 0;
-  background-size: cover;
-  background-position: center;
-  transition: background-image 1s ease-in-out;
-}
-
-@keyframes bgslide {
-  0% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage1.jpg'); }
-  25% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage2.jpg'); }
-  50% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage3.jpg'); }
-  75% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage4.jpg'); }
-  100% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage1.jpg'); }
-}
-
-body {
-  animation: bgslide 20s infinite;
-}
-</style>
-"""
-
-html(html_code, height=0)
