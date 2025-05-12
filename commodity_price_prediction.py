@@ -175,10 +175,10 @@ if commodity and state and district:
 st.header("🖼️ Live Image Gallery")
 
 image_urls = [
-    "https://github.com/prakaash2004/agriculture-prediction-app/imgage1.jpg",
-    "https://github.com/prakaash2004/agriculture-prediction-app/imgage2.jpg",
-    "https://github.com/prakaash2004/agriculture-prediction-app/imgage3.jpg",
-    "https://github.com/prakaash2004/agriculture-prediction-app/imgage4.jpg",
+    "https://github.com/prakaash2004/agriculture-prediction-app/main/imgage1.jpg",
+    "https://github.com/prakaash2004/agriculture-prediction-app/main/imgage2.jpg",
+    "https://github.com/prakaash2004/agriculture-prediction-app/main/imgage3.jpg",
+    "https://github.com/prakaash2004/agriculture-prediction-app/main/imgage4.jpg",
     
 ]
 
