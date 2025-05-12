@@ -61,7 +61,7 @@ if commodity:
             st.dataframe(district_markets[['Market', 'Price per kg (INR)']])
 
 # DOMAIN 2: Future Forecast
-st.header("🔮 Future Price Forecast Using LSTM (Realistic 2-year fall limit)")
+st.header("🔮 Future Price Forecast Using LSTM")
 
 if commodity and state and district:
     future_year = st.number_input("Select Future Year", min_value=2025, max_value=2100, value=2030)
