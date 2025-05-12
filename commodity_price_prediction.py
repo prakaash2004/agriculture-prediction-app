@@ -172,17 +172,30 @@ if commodity and state and district:
 
                 st.success(f"📌 Predicted Modal Price of {commodity} in {district}, {state} for {future_year} is ₹{future_prices_smoothed.iloc[-1]:.2f}/kg")
                 # DOMAIN 3: Live Image Gallery
-st.header("🖼️ Live Image Gallery")
+from streamlit.components.v1 import html
 
-image_urls = [
-    "https://github.com/prakaash2004/agriculture-prediction-app/main/imgage1.jpg",
-    "https://github.com/prakaash2004/agriculture-prediction-app/main/imgage2.jpg",
-    "https://github.com/prakaash2004/agriculture-prediction-app/main/imgage3.jpg",
-    "https://github.com/prakaash2004/agriculture-prediction-app/main/imgage4.jpg",
-    
-]
+html_code = """
+<style>
+body {
+  margin: 0;
+  padding: 0;
+  background-size: cover;
+  background-position: center;
+  transition: background-image 1s ease-in-out;
+}
 
-cols = st.columns(4)
-for i, url in enumerate(image_urls):
-    with cols[i]:
-        st.image(url, use_column_width=True, caption=f"Image {i+1}")
+@keyframes bgslide {
+  0% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage1.jpg'); }
+  25% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage2.jpg'); }
+  50% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage3.jpg'); }
+  75% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage4.jpg'); }
+  100% { background-image: url('https://raw.githubusercontent.com/prakaash2004/agriculture-prediction-app/main/imgage1.jpg'); }
+}
+
+body {
+  animation: bgslide 20s infinite;
+}
+</style>
+"""
+
+html(html_code, height=0)
