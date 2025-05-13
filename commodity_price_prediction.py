@@ -14,7 +14,7 @@ warnings.filterwarnings('ignore')
 df = pd.read_csv('agrio.csv')
 df_2025 = df[df['Year'] == 2025]
 
-st.title("🌾 Agriculture Commodity Monitoring and Realistic Forecasting System")
+st.title("🌾PREDICTION OF AGRICULTURE COMMODITY USING THE LONG SHORT-TERM MEMORY MODEL ")
 
 # DOMAIN 1: Real-Time Commodity Values
 st.header("📊 Real-Time 2025 Commodity Explorer")
